@@ -4,15 +4,24 @@ A local password manager that lets you securely store and retrieve your account 
 # How to run
 Provide here instructions on how to use your application.   
 - Download the latest binary from the Release section on the right on GitHub.  
-- On the command line uncompress using
+- On the command line start virtual environment:
 ```
-tar -xzf  
+ python3 -m venv venv  
 ```
-- On the command line run with
+- On the command line activate venv.
 ```
-./hello
+source venv/bin/activate
 ```
-- You will see Hello World! on your terminal. 
+
+Install requirements:
+```
+pip3 install flask 
+pip3 install cryptography
+```
+Run code:
+```
+python3 passwordManager.py
+```
 
 # How to contribute
 Follow this project board to know the latest status of the project: [http://...]([http://...])  
