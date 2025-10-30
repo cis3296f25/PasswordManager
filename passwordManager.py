@@ -55,9 +55,15 @@ def get_credential(site):
 
 @app.route("/delete/<site>", methods=["DELETE"])
 def delete_credential(site):
+    c.execute("SELECT username, password FROM credentials WHERE site = ?", (site,))
+    row = c.fetchone()
+    if not row: 
+        return jsonify({"error": "not found"})
+    username, encrypted_password = row
+    password = cipher.decrypt(encrypted_password).decode()
     c.execute("DELETE FROM credentials WHERE site = ?", (site,))
     conn.commit()
-    return jsonify({"status": "deleted"})
+    return jsonify({"site": site, "username": username, "password": password})
 
 # Password generator
 def generate_password(length=12):
@@ -79,8 +85,8 @@ if __name__ == "__main__":
         res2 = client.get(f"/get/{'github.com'}")
         print("Retrieved from vault:", res.json, res2.json)
 
-        client.delete(f"/delete/{test_site}")
-        print("Deleted site:", client.get(f"/get/{test_site}").json)
+        deleted_resp = client.delete(f"/delete/{test_site}")
+        print("Deleted site:", deleted_resp.json)
         
     # Run server
     app.run(port=5000)
