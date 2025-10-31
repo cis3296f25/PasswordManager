@@ -32,8 +32,33 @@ conn.commit()
 # Flask API
 app = Flask(__name__)
 
+vault_locked = False
+
+@app.route("/lock", methods=["POST"])
+def lock_vault():
+    """Lock the vault (no add/get/delete allowed until unlocked)."""
+    global vault_locked
+    vault_locked = True
+    return jsonify({"status": "vault locked"})
+
+@app.route("/unlock", methods=["POST"])
+def unlock_vault():
+    """Unlock the vault."""
+    global vault_locked
+    vault_locked = False
+    return jsonify({"status": "vault unlocked"})
+
+@app.route("/status", methods=["GET"])
+def vault_status():
+    """Check current vault state."""
+    return jsonify({"vault_locked": vault_locked})
+
 @app.route("/add", methods=["POST"])
 def add_credential():
+    global vault_locked
+    if vault_locked:
+        return jsonify({"error": "Vault is locked"}), 423
+
     data = request.json
     encrypted_password = cipher.encrypt(data["password"].encode())
     c.execute(
@@ -45,6 +70,10 @@ def add_credential():
 
 @app.route("/get/<site>", methods=["GET"])
 def get_credential(site):
+    global vault_locked
+    if vault_locked:
+        return jsonify({"error": "Vault is locked"}), 423
+
     c.execute("SELECT username, password FROM credentials WHERE site = ?", (site,))
     row = c.fetchone()
     if row:
@@ -55,15 +84,13 @@ def get_credential(site):
 
 @app.route("/delete/<site>", methods=["DELETE"])
 def delete_credential(site):
-    c.execute("SELECT username, password FROM credentials WHERE site = ?", (site,))
-    row = c.fetchone()
-    if not row: 
-        return jsonify({"error": "not found"})
-    username, encrypted_password = row
-    password = cipher.decrypt(encrypted_password).decode()
+    global vault_locked
+    if vault_locked:
+        return jsonify({"error": "Vault is locked"}), 423
+
     c.execute("DELETE FROM credentials WHERE site = ?", (site,))
     conn.commit()
-    return jsonify({"site": site, "username": username, "password": password})
+    return jsonify({"status": "deleted"})
 
 # List all stored credentials
 @app.route("/list", methods=["GET"])
@@ -111,6 +138,7 @@ if __name__ == "__main__":
         client.put("/update", json={"site": "github.com", "password": "NewSecurePass123!"})
         updated_resp = client.get("/get/github.com")
         print("Updated GitHub credential:", updated_resp.json)
+
         
     # Run server
     app.run(port=5000)
