@@ -92,6 +92,23 @@ def delete_credential(site):
     conn.commit()
     return jsonify({"status": "deleted"})
 
+# List all stored credentials
+@app.route("/list", methods=["GET"])
+def list_credentials():
+    c.execute("SELECT site, username FROM credentials")
+    rows = c.fetchall()
+    return jsonify([{"site": site, "username": username} for site, username in rows])
+
+# Update password for a site
+@app.route("/update", methods=["PUT"])
+def update_password():
+    data = request.json
+    encrypted_password = cipher.encrypt(data["password"].encode())
+    c.execute("UPDATE credentials SET password = ? WHERE site = ?", (encrypted_password, data["site"]))
+    conn.commit()
+    return jsonify({"status": "updated", "site": data["site"]})
+
+
 # Password generator
 def generate_password(length=12):
     chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()"
@@ -112,8 +129,16 @@ if __name__ == "__main__":
         res2 = client.get(f"/get/{'github.com'}")
         print("Retrieved from vault:", res.json, res2.json)
 
-        client.delete(f"/delete/{test_site}")
-        print("Deleted site:", client.get(f"/get/{test_site}").json)
+        deleted_resp = client.delete(f"/delete/{test_site}")
+        print("Deleted site:", deleted_resp.json)
+
+        list_resp = client.get("/list")
+        print("All stored credentials:", list_resp.json)
+
+        client.put("/update", json={"site": "github.com", "password": "NewSecurePass123!"})
+        updated_resp = client.get("/get/github.com")
+        print("Updated GitHub credential:", updated_resp.json)
+
         
     # Run server
     app.run(port=5000)
