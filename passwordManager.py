@@ -4,7 +4,7 @@ from cryptography.fernet import Fernet
 import secrets
 import os
 
-# Persistent key
+# Database stuff (to be refactored into repository later) #################################
 KEY_FILE = "vault.key"
 
 if os.path.exists(KEY_FILE):
@@ -17,7 +17,6 @@ else:
 
 cipher = Fernet(key)
 
-# Setup database
 conn = sqlite3.connect("vault.db", check_same_thread=False)
 c = conn.cursor()
 c.execute("""
@@ -28,12 +27,13 @@ CREATE TABLE IF NOT EXISTS credentials (
 )
 """)
 conn.commit()
+###################################################################################
 
 # Flask API
 app = Flask(__name__)
-
 vault_locked = False
 
+# POST methods ###########################################################################
 @app.route("/lock", methods=["POST"])
 def lock_vault():
     """Lock the vault (no add/get/delete allowed until unlocked)."""
@@ -47,11 +47,6 @@ def unlock_vault():
     global vault_locked
     vault_locked = False
     return jsonify({"status": "vault unlocked"})
-
-@app.route("/status", methods=["GET"])
-def vault_status():
-    """Check current vault state."""
-    return jsonify({"vault_locked": vault_locked})
 
 @app.route("/add", methods=["POST"])
 def add_credential():
@@ -68,6 +63,12 @@ def add_credential():
     conn.commit()
     return jsonify({"status": "added"})
 
+# GET methods ###########################################################################
+@app.route("/status", methods=["GET"])
+def vault_status():
+    """Check current vault state."""
+    return jsonify({"vault_locked": vault_locked})
+
 @app.route("/get/<site>", methods=["GET"])
 def get_credential(site):
     global vault_locked
@@ -82,6 +83,21 @@ def get_credential(site):
         return jsonify({"site": site, "username": username, "password": password})
     return jsonify({"error": "not found"})
 
+# Password generator
+@app.route("/get/generated-password", methods=["GET"])
+def generate_password(length=12):
+    chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()"
+    password = ''.join(secrets.choice(chars) for _ in range(length))
+    return jsonify({"password": password})
+
+# List all stored credentials
+@app.route("/list", methods=["GET"])
+def list_credentials():
+    c.execute("SELECT site, username FROM credentials")
+    rows = c.fetchall()
+    return jsonify([{"site": site, "username": username} for site, username in rows])
+
+# DELETE methods #############################################################################
 @app.route("/delete/<site>", methods=["DELETE"])
 def delete_credential(site):
     global vault_locked
@@ -92,13 +108,7 @@ def delete_credential(site):
     conn.commit()
     return jsonify({"status": "deleted"})
 
-# List all stored credentials
-@app.route("/list", methods=["GET"])
-def list_credentials():
-    c.execute("SELECT site, username FROM credentials")
-    rows = c.fetchall()
-    return jsonify([{"site": site, "username": username} for site, username in rows])
-
+# PUT methods #########################################################################
 # Update password for a site
 @app.route("/update", methods=["PUT"])
 def update_password():
@@ -109,17 +119,12 @@ def update_password():
     return jsonify({"status": "updated", "site": data["site"]})
 
 
-# Password generator
-def generate_password(length=12):
-    chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()"
-    return ''.join(secrets.choice(chars) for _ in range(length))
-
 # Test and run
 if __name__ == "__main__":
     # Example test credential
     test_site = "example.com"
     test_user = "alice"
-    test_pass = generate_password()
+    test_pass = "testpassword"
     print(f"Generated password for {test_user}@{test_site}: {test_pass}")
 
     with app.test_client() as client:
