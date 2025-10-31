@@ -24,7 +24,7 @@ python3 passwordManager.py
 ```
 
 # How to contribute
-Follow this project board to know the latest status of the project: [http://...]([http://...])  
+Follow this project board to know the latest status of the project: [https://github.com/orgs/cis3296f25/projects/71]  
 
 ### How to build
 - Use this github repository: ... 
